@@ -3,184 +3,196 @@ import HomeButton from '../HomeButton';
 import StarsAnimation from '../StarsAnimation';
 
 const SortLettersGame = ({ setScreen }) => {
-  const [draggedLetter, setDraggedLetter] = useState(null);
-  const [dragSource, setDragSource] = useState(null);
-  const [selectedLetter, setSelectedLetter] = useState(null);
-  const [selectedSource, setSelectedSource] = useState(null);
-  const [targetSlots, setTargetSlots] = useState(['', '', '', '', '']);
-  const [availableLetters, setAvailableLetters] = useState([]);
-  const [mistakes, setMistakes] = useState(0);
+  const correctOrder = ['א', 'ב', 'ג', 'ד', 'ה'];
+  
+  // State
+  const [storage, setStorage] = useState([]);
+  const [slots, setSlots] = useState([null, null, null, null, null]);
+  const [attempts, setAttempts] = useState(0);
   const [stars, setStars] = useState(5);
   const [message, setMessage] = useState('');
   const [speaker, setSpeaker] = useState('dog');
   const [gameComplete, setGameComplete] = useState(false);
   const [shakeSlots, setShakeSlots] = useState([]);
-  const [isMobile, setIsMobile] = useState(false);
   
-  const correctOrder = ['א', 'ב', 'ג', 'ד', 'ה'];
+  // Drag state
+  const [draggedLetter, setDraggedLetter] = useState(null);
+  const [draggedFrom, setDraggedFrom] = useState(null);
+  const [dragOverSlot, setDragOverSlot] = useState(null);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    resetToInitial();
-    
-    return () => window.removeEventListener('resize', checkMobile);
+    resetGame();
   }, []);
 
-  const resetToInitial = () => {
+  const resetGame = () => {
     const shuffled = [...correctOrder].sort(() => Math.random() - 0.5);
-    setAvailableLetters(shuffled);
-    setTargetSlots(['', '', '', '', '']);
-    setShakeSlots([]);
-    setSelectedLetter(null);
-    setSelectedSource(null);
-    setMistakes(0);
+    setStorage(shuffled);
+    setSlots([null, null, null, null, null]);
+    setAttempts(0);
     setStars(5);
     setGameComplete(false);
-    setMessage(isMobile ? 'לחצו על אות ואז על משבצת!' : 'סדרו את האותיות לפי הא"ב!');
+    setShakeSlots([]);
+    setMessage('גררו את האותיות למשבצות בסדר הנכון!');
     setSpeaker('dog');
+    setDraggedLetter(null);
+    setDraggedFrom(null);
+    setDragOverSlot(null);
   };
 
-  const handleLetterClick = (letter, source) => {
-    if (selectedLetter === letter && JSON.stringify(selectedSource) === JSON.stringify(source)) {
-      setSelectedLetter(null);
-      setSelectedSource(null);
-    } else {
-      setSelectedLetter(letter);
-      setSelectedSource(source);
-    }
-  };
-
-  const handleSlotClick = (slotIndex) => {
-    if (!selectedLetter || !selectedSource) return;
-
-    const newSlots = [...targetSlots];
-    
-    if (selectedSource.type === 'storage') {
-      if (newSlots[slotIndex]) {
-        setAvailableLetters([...availableLetters, newSlots[slotIndex]]);
-      }
-      newSlots[slotIndex] = selectedLetter;
-      setAvailableLetters(availableLetters.filter(l => l !== selectedLetter));
-      
-    } else if (selectedSource.type === 'slot') {
-      const sourceSlotIndex = selectedSource.index;
-      
-      if (newSlots[slotIndex]) {
-        const targetLetter = newSlots[slotIndex];
-        newSlots[slotIndex] = selectedLetter;
-        newSlots[sourceSlotIndex] = targetLetter;
-      } else {
-        newSlots[slotIndex] = selectedLetter;
-        newSlots[sourceSlotIndex] = '';
-      }
-    }
-    
-    setTargetSlots(newSlots);
-    setSelectedLetter(null);
-    setSelectedSource(null);
-  };
-
-  const handleStorageClick = () => {
-    if (!selectedLetter || !selectedSource) return;
-    
-    if (selectedSource.type === 'slot') {
-      const newSlots = [...targetSlots];
-      newSlots[selectedSource.index] = '';
-      setTargetSlots(newSlots);
-      setAvailableLetters([...availableLetters, selectedLetter]);
-    }
-    
-    setSelectedLetter(null);
-    setSelectedSource(null);
-  };
-
+  // ========== DESKTOP DRAG & DROP ==========
+  
   const handleDragStart = (e, letter, source) => {
-    if (isMobile) {
-      e.preventDefault();
-      return;
-    }
+    e.stopPropagation();
     setDraggedLetter(letter);
-    setDragSource(source);
+    setDraggedFrom(source);
+    
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', letter);
+  };
+
+  const handleDragEnd = (e) => {
+    setDraggedLetter(null);
+    setDraggedFrom(null);
+    setDragOverSlot(null);
   };
 
   const handleDragOver = (e) => {
-    if (isMobile) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnterSlot = (e, index) => {
+    e.preventDefault();
+    setDragOverSlot(index);
+  };
+
+  const handleDragLeaveSlot = (e) => {
+    setDragOverSlot(null);
+  };
+
+  const handleDropOnSlot = (e, targetIndex) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!draggedLetter || draggedFrom === null) return;
+
+    performMove(draggedFrom, { type: 'slot', index: targetIndex });
+    
+    setDraggedLetter(null);
+    setDraggedFrom(null);
+    setDragOverSlot(null);
+  };
+
+  const handleDragEnterStorage = (e) => {
     e.preventDefault();
   };
 
-  const handleDrop = (slotIndex) => {
-    if (isMobile || !draggedLetter) return;
-
-    const newSlots = [...targetSlots];
+  const handleDropOnStorage = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     
-    if (dragSource.type === 'storage') {
-      if (newSlots[slotIndex]) {
-        setAvailableLetters([...availableLetters, newSlots[slotIndex]]);
-      }
-      newSlots[slotIndex] = draggedLetter;
-      setAvailableLetters(availableLetters.filter(l => l !== draggedLetter));
+    if (!draggedLetter || draggedFrom === null) return;
+    
+    if (draggedFrom.type === 'slot') {
+      const newSlots = [...slots];
+      newSlots[draggedFrom.index] = null;
+      setSlots(newSlots);
+      setStorage([...storage, draggedLetter]);
+    }
+    
+    setDraggedLetter(null);
+    setDraggedFrom(null);
+    setDragOverSlot(null);
+  };
+
+  // ========== DOUBLE CLICK ==========
+  
+  const handleDoubleClick = (letter, source) => {
+    if (source.type === 'slot') {
+      const newSlots = [...slots];
+      newSlots[source.index] = null;
+      setSlots(newSlots);
+      setStorage([...storage, letter]);
+      setMessage('האות חזרה למחסן!');
+      setSpeaker('cat');
+    }
+  };
+
+  // ========== MOVE LOGIC ==========
+  
+  const performMove = (from, to) => {
+    const newSlots = [...slots];
+    const newStorage = [...storage];
+    
+    // From storage to slot
+    if (from.type === 'storage' && to.type === 'slot') {
+      const letterToMove = draggedLetter;
+      const targetLetter = newSlots[to.index];
       
-    } else if (dragSource.type === 'slot') {
-      const sourceSlotIndex = dragSource.index;
+      // Remove from storage
+      const storageIndex = newStorage.indexOf(letterToMove);
+      newStorage.splice(storageIndex, 1);
       
-      if (newSlots[slotIndex]) {
-        const targetLetter = newSlots[slotIndex];
-        newSlots[slotIndex] = draggedLetter;
-        newSlots[sourceSlotIndex] = targetLetter;
+      // Place in slot
+      newSlots[to.index] = letterToMove;
+      
+      // If slot was occupied, return old letter to storage
+      if (targetLetter) {
+        newStorage.push(targetLetter);
+        setMessage(`החלפה: ${letterToMove} נכנסה, ${targetLetter} חזרה למחסן`);
       } else {
-        newSlots[slotIndex] = draggedLetter;
-        newSlots[sourceSlotIndex] = '';
+        setMessage(`כל הכבוד! ${letterToMove} במקום`);
       }
+      setSpeaker('cat');
+    }
+    // From slot to slot (swap)
+    else if (from.type === 'slot' && to.type === 'slot') {
+      const fromLetter = newSlots[from.index];
+      const toLetter = newSlots[to.index];
+      
+      // Swap
+      newSlots[from.index] = toLetter;
+      newSlots[to.index] = fromLetter;
+      
+      if (toLetter) {
+        setMessage(`החלפה: ${fromLetter} ↔ ${toLetter}`);
+      } else {
+        setMessage(`${fromLetter} עברה למשבצת ${to.index + 1}`);
+      }
+      setSpeaker('dog');
     }
     
-    setTargetSlots(newSlots);
-    setDraggedLetter(null);
-    setDragSource(null);
+    setSlots(newSlots);
+    setStorage(newStorage);
   };
 
-  const handleDropToStorage = () => {
-    if (isMobile || !draggedLetter || !dragSource) return;
-    
-    if (dragSource.type === 'slot') {
-      const newSlots = [...targetSlots];
-      newSlots[dragSource.index] = '';
-      setTargetSlots(newSlots);
-      setAvailableLetters([...availableLetters, draggedLetter]);
-    }
-    
-    setDraggedLetter(null);
-    setDragSource(null);
-  };
-
+  // ========== CHECK SOLUTION ==========
+  
   const checkOrder = () => {
-    if (targetSlots.some(slot => slot === '')) {
-      setMessage('עוד לא סיימתם! צריך למלא את כל המשבצות');
+    if (slots.some(slot => slot === null)) {
+      setMessage('עוד לא סיימת! צריך למלא את כל המשבצות');
       setSpeaker('cat');
       return;
     }
 
-    const isCorrect = targetSlots.every((letter, index) => letter === correctOrder[index]);
+    const isCorrect = slots.every((letter, index) => letter === correctOrder[index]);
 
     if (isCorrect) {
       setGameComplete(true);
-      setMessage('סיימתם את המשחק!');
+      setMessage('מעולה! סיימת את המשחק!');
       setSpeaker('both');
     } else {
-      const wrongIndices = targetSlots
+      const wrongIndices = slots
         .map((letter, index) => letter !== correctOrder[index] ? index : null)
         .filter(index => index !== null);
       
       setShakeSlots(wrongIndices);
       setTimeout(() => setShakeSlots([]), 500);
       
-      const newMistakes = mistakes + 1;
-      setMistakes(newMistakes);
-      const newStars = Math.max(2, 5 - newMistakes);
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      const newStars = Math.max(2, 5 - newAttempts);
       setStars(newStars);
       
       const wrongCount = wrongIndices.length;
@@ -198,79 +210,77 @@ const SortLettersGame = ({ setScreen }) => {
     }
   };
 
-  const resetGame = () => {
-    resetToInitial();
-  };
-
-  const isLetterSelected = (letter, source) => {
-    return selectedLetter === letter && JSON.stringify(selectedSource) === JSON.stringify(source);
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-200 to-green-300 flex flex-col items-center justify-between p-4 overflow-hidden relative touch-none" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-b from-green-200 to-green-300 flex flex-col items-center justify-between p-4 overflow-hidden relative" dir="rtl">
       <HomeButton setScreen={setScreen} />
       
-      <div className="absolute inset-0 opacity-20">
+      {/* Background effects */}
+      <div className="absolute inset-0 opacity-20 pointer-events-none">
         <div className="absolute bottom-0 right-0 w-32 h-32 bg-green-600 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute top-20 left-10 w-40 h-40 bg-green-500 rounded-full blur-3xl animate-pulse"></div>
       </div>
 
+      {/* Title */}
       <div className="w-full max-w-2xl z-10 pt-16">
         <h1 className="text-2xl md:text-4xl font-bold text-amber-800 mb-4 text-center">סדר את האותיות</h1>
       </div>
 
+      {/* Main Game Area */}
       <div className="flex-1 flex items-center justify-center w-full max-w-3xl z-10">
         {!gameComplete ? (
           <div className="w-full space-y-8">
+            {/* Storage Area */}
             <div className="bg-white bg-opacity-80 rounded-2xl p-4 shadow-lg">
               <p className="text-lg font-bold text-amber-800 mb-3 text-center">
-                {isMobile ? 'לחצו על האותיות:' : 'גררו או לחצו על האותיות:'}
+                מחסן אותיות - גררו מכאן:
               </p>
               <div 
-                className="flex justify-center gap-3 flex-wrap min-h-20 p-2 border-4 border-dashed border-green-500 rounded-xl bg-green-50"
+                className="flex justify-center gap-3 flex-wrap min-h-24 p-4 border-4 border-dashed border-green-500 rounded-xl bg-green-50 transition-all"
                 onDragOver={handleDragOver}
-                onDrop={handleDropToStorage}
-                onClick={handleStorageClick}
+                onDrop={handleDropOnStorage}
+                onDragEnter={handleDragEnterStorage}
               >
-                {availableLetters.map((letter, index) => (
+                {storage.map((letter, index) => (
                   <div
-                    key={`${letter}-${index}`}
-                    draggable={!isMobile}
-                    onDragStart={(e) => handleDragStart(e, letter, { type: 'storage' })}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleLetterClick(letter, { type: 'storage' });
-                    }}
-                    className={`w-16 h-16 md:w-20 md:h-20 bg-orange-400 hover:bg-orange-500 rounded-xl shadow-lg cursor-pointer flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 active:scale-95 transition-transform select-none
-                      ${isLetterSelected(letter, { type: 'storage' }) ? 'ring-4 ring-blue-500 scale-105' : ''}
+                    key={`storage-${letter}-${index}`}
+                    draggable="true"
+                    onDragStart={(e) => handleDragStart(e, letter, { type: 'storage', index })}
+                    onDragEnd={handleDragEnd}
+                    className={`w-16 h-16 md:w-20 md:h-20 bg-orange-400 hover:bg-orange-500 rounded-xl shadow-lg flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 transition-all select-none
+                      ${draggedLetter === letter && draggedFrom?.type === 'storage' ? 'opacity-30 scale-95 cursor-grabbing' : 'cursor-grab hover:scale-105'}
                     `}
                   >
                     {letter}
                   </div>
                 ))}
-                {availableLetters.length === 0 && (
-                  <div className="text-gray-400 text-center py-4 w-full">
-                    {isMobile ? 'לחצו כאן עם אות נבחרת' : 'גררו/לחצו כאן להחזיר אות'}
+                {storage.length === 0 && (
+                  <div className="text-gray-400 text-center py-6 w-full">
+                    כל האותיות במשבצות!
                   </div>
                 )}
               </div>
             </div>
 
+            {/* Target Slots */}
             <div className="bg-white bg-opacity-80 rounded-2xl p-4 shadow-lg">
-              <p className="text-lg font-bold text-amber-800 mb-3 text-center">שימו כאן לפי הסדר:</p>
+              <p className="text-lg font-bold text-amber-800 mb-3 text-center">גררו לכאן לפי הסדר (א-ב-ג-ד-ה):</p>
               <div className="flex justify-center gap-2 md:gap-3 mb-4">
-                {targetSlots.map((letter, index) => (
+                {slots.map((letter, index) => (
                   <div
-                    key={index}
-                    draggable={!isMobile && !!letter}
+                    key={`slot-${index}`}
+                    draggable={letter !== null}
                     onDragStart={(e) => letter && handleDragStart(e, letter, { type: 'slot', index })}
+                    onDragEnd={handleDragEnd}
                     onDragOver={handleDragOver}
-                    onDrop={() => handleDrop(index)}
-                    onClick={() => letter ? handleLetterClick(letter, { type: 'slot', index }) : handleSlotClick(index)}
-                    className={`w-16 h-16 md:w-20 md:h-20 border-4 border-dashed border-amber-600 rounded-xl flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 transition-all select-none
-                      ${letter ? 'bg-orange-300 cursor-pointer hover:bg-orange-200' : 'bg-white bg-opacity-50 cursor-pointer'}
+                    onDragEnter={(e) => handleDragEnterSlot(e, index)}
+                    onDragLeave={handleDragLeaveSlot}
+                    onDrop={(e) => handleDropOnSlot(e, index)}
+                    onDoubleClick={() => letter && handleDoubleClick(letter, { type: 'slot', index })}
+                    className={`w-16 h-16 md:w-20 md:h-20 border-4 border-dashed rounded-xl flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 transition-all select-none
+                      ${letter ? 'bg-orange-300 cursor-grab hover:bg-orange-400 hover:scale-105' : 'bg-white bg-opacity-50'}
+                      ${dragOverSlot === index ? 'border-blue-500 bg-blue-100 scale-110' : 'border-amber-600'}
                       ${shakeSlots.includes(index) ? 'animate-shake bg-red-300' : ''}
-                      ${letter && isLetterSelected(letter, { type: 'slot', index }) ? 'ring-4 ring-blue-500 scale-105' : ''}
+                      ${draggedLetter === letter && draggedFrom?.type === 'slot' && draggedFrom?.index === index ? 'opacity-30 scale-95 cursor-grabbing' : ''}
                     `}
                   >
                     {letter}
@@ -285,7 +295,7 @@ const SortLettersGame = ({ setScreen }) => {
                   בדוק את הסדר!
                 </button>
                 <button
-                  onClick={resetToInitial}
+                  onClick={resetGame}
                   className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all text-lg"
                 >
                   התחל מחדש
@@ -297,7 +307,7 @@ const SortLettersGame = ({ setScreen }) => {
           <div className="text-center space-y-6">
             <div className="text-6xl animate-bounce">🎉</div>
             <div className="text-3xl md:text-4xl font-bold text-amber-800">
-              זכיתם ב-
+              זכית ב-
             </div>
             <StarsAnimation stars={stars} />
             <div className="text-2xl md:text-3xl font-bold text-green-700">
@@ -321,6 +331,7 @@ const SortLettersGame = ({ setScreen }) => {
         )}
       </div>
 
+      {/* Message Area */}
       <div className="w-full max-w-3xl z-10 mb-4">
         <div className="bg-white bg-opacity-90 rounded-2xl p-4 md:p-6 shadow-xl">
           <div className="flex items-center gap-4 mb-3">
@@ -340,7 +351,7 @@ const SortLettersGame = ({ setScreen }) => {
           
           <div className="flex justify-center items-center text-sm md:text-base text-gray-600">
             <div className="text-amber-700">
-              {isMobile ? '💡 לחצו על אות ואז על משבצת' : '💡 לחצו/גררו אותיות להחלפה'}
+              💡 גרירה בין משבצות = החלפה • לחיצה כפולה = החזרה למחסן
             </div>
           </div>
         </div>
@@ -355,16 +366,17 @@ const SortLettersGame = ({ setScreen }) => {
         .animate-shake {
           animation: shake 0.5s;
         }
-        .touch-none {
-          touch-action: none;
-          -webkit-user-drag: none;
-          -webkit-touch-callout: none;
-        }
         .select-none {
           -webkit-user-select: none;
           -moz-user-select: none;
           -ms-user-select: none;
           user-select: none;
+        }
+        .cursor-grab {
+          cursor: grab;
+        }
+        .cursor-grabbing {
+          cursor: grabbing;
         }
       `}</style>
     </div>

@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/hebrew-letters-game/static/css/main.e6c13ad2.css",
+    "main.js": "/hebrew-letters-game/static/js/main.9e9c15b1.js",
+    "static/js/453.12fc0e6e.chunk.js": "/hebrew-letters-game/static/js/453.12fc0e6e.chunk.js",
+    "index.html": "/hebrew-letters-game/index.html",
+    "main.e6c13ad2.css.map": "/hebrew-letters-game/static/css/main.e6c13ad2.css.map",
+    "main.9e9c15b1.js.map": "/hebrew-letters-game/static/js/main.9e9c15b1.js.map",
+    "453.12fc0e6e.chunk.js.map": "/hebrew-letters-game/static/js/453.12fc0e6e.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.e6c13ad2.css",
+    "static/js/main.9e9c15b1.js"
+  ]
+}

@@ -96,6 +96,7 @@ const FindLetterGame = ({ setScreen }) => {
   const [gameComplete, setGameComplete] = useState(false);
   const [celebrateButton, setCelebrateButton] = useState(null);
   const [shakeButton, setShakeButton] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const letters = ['א', 'ב', 'ג', 'ד', 'ה'];
   const totalQuestions = 5;
@@ -109,12 +110,14 @@ const FindLetterGame = ({ setScreen }) => {
     setCurrentLetter(randomLetter);
     setMessage(`מצאו את האות ${randomLetter}!`);
     setSpeaker('dog');
+    setIsProcessing(false);
   };
 
   const handleLetterClick = (letter) => {
-    if (gameComplete) return;
+    if (gameComplete || isProcessing) return;
     
     if (letter === currentLetter) {
+      setIsProcessing(true);
       setCelebrateButton(letter);
       setTimeout(() => setCelebrateButton(null), 600);
       
@@ -129,6 +132,7 @@ const FindLetterGame = ({ setScreen }) => {
           setGameComplete(true);
           setMessage('סיימתם! אתם אלופים!');
           setSpeaker('both');
+          setIsProcessing(false);
         }, 1500);
       } else {
         setTimeout(() => {
@@ -155,6 +159,7 @@ const FindLetterGame = ({ setScreen }) => {
     setMistakes(0);
     setStars(5);
     setGameComplete(false);
+    setIsProcessing(false);
     startNewQuestion();
   };
 
@@ -168,15 +173,14 @@ const FindLetterGame = ({ setScreen }) => {
       </div>
 
       <div className="w-full max-w-2xl z-10">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl md:text-4xl font-bold text-amber-800">מצא את האות</h1>
-          <div className="flex gap-1">
-            {[...Array(5)].map((_, i) => (
-              <span key={i} className="text-2xl md:text-3xl">
-                {i < stars ? '⭐' : '☆'}
-              </span>
-            ))}
-          </div>
+        <h1 className="text-2xl md:text-4xl font-bold text-amber-800 mb-3 text-center">מצא את האות</h1>
+        
+        <div className="flex justify-center gap-1 mb-4">
+          {[...Array(5)].map((_, i) => (
+            <span key={i} className="text-2xl md:text-3xl">
+              {i < stars ? '⭐' : '☆'}
+            </span>
+          ))}
         </div>
         
         <div className="bg-white bg-opacity-80 rounded-lg p-3 text-center shadow-lg">
@@ -193,6 +197,7 @@ const FindLetterGame = ({ setScreen }) => {
               <button
                 key={letter}
                 onClick={() => handleLetterClick(letter)}
+                disabled={isProcessing}
                 className={`
                   aspect-square bg-orange-400 hover:bg-orange-500 rounded-2xl 
                   shadow-lg hover:shadow-xl transition-all duration-200
@@ -200,6 +205,7 @@ const FindLetterGame = ({ setScreen }) => {
                   active:scale-95 transform
                   ${celebrateButton === letter ? 'animate-bounce bg-green-500 scale-110' : ''}
                   ${shakeButton === letter ? 'animate-shake bg-red-400' : ''}
+                  ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
               >
                 {letter}
@@ -212,7 +218,7 @@ const FindLetterGame = ({ setScreen }) => {
             <div className="text-3xl font-bold text-amber-800">
               קיבלתם {stars} כוכבים!
             </div>
-            <div className="flex gap-4 justify-center">
+            <div className="flex gap-4 justify-center flex-wrap">
               <button
                 onClick={resetGame}
                 className="bg-orange-400 hover:bg-orange-500 px-8 py-4 rounded-full text-xl font-bold text-amber-900 shadow-lg hover:shadow-xl transition-all"
@@ -272,6 +278,8 @@ const FindLetterGame = ({ setScreen }) => {
 const SortLettersGame = ({ setScreen }) => {
   const [draggedLetter, setDraggedLetter] = useState(null);
   const [dragSource, setDragSource] = useState(null);
+  const [selectedLetter, setSelectedLetter] = useState(null);
+  const [selectedSource, setSelectedSource] = useState(null);
   const [targetSlots, setTargetSlots] = useState(['', '', '', '', '']);
   const [availableLetters, setAvailableLetters] = useState([]);
   const [mistakes, setMistakes] = useState(0);
@@ -292,6 +300,8 @@ const SortLettersGame = ({ setScreen }) => {
     setAvailableLetters(shuffled);
     setTargetSlots(['', '', '', '', '']);
     setShakeSlots([]);
+    setSelectedLetter(null);
+    setSelectedSource(null);
     setMistakes(0);
     setStars(5);
     setGameComplete(false);
@@ -299,6 +309,64 @@ const SortLettersGame = ({ setScreen }) => {
     setSpeaker('dog');
   };
 
+  // מערכת לחיצות למובייל
+  const handleLetterClick = (letter, source) => {
+    if (selectedLetter === letter && JSON.stringify(selectedSource) === JSON.stringify(source)) {
+      // ביטול בחירה
+      setSelectedLetter(null);
+      setSelectedSource(null);
+    } else {
+      // בחירת אות
+      setSelectedLetter(letter);
+      setSelectedSource(source);
+    }
+  };
+
+  const handleSlotClick = (slotIndex) => {
+    if (!selectedLetter || !selectedSource) return;
+
+    const newSlots = [...targetSlots];
+    
+    if (selectedSource.type === 'storage') {
+      if (newSlots[slotIndex]) {
+        setAvailableLetters([...availableLetters, newSlots[slotIndex]]);
+      }
+      newSlots[slotIndex] = selectedLetter;
+      setAvailableLetters(availableLetters.filter(l => l !== selectedLetter));
+      
+    } else if (selectedSource.type === 'slot') {
+      const sourceSlotIndex = selectedSource.index;
+      
+      if (newSlots[slotIndex]) {
+        const targetLetter = newSlots[slotIndex];
+        newSlots[slotIndex] = selectedLetter;
+        newSlots[sourceSlotIndex] = targetLetter;
+      } else {
+        newSlots[slotIndex] = selectedLetter;
+        newSlots[sourceSlotIndex] = '';
+      }
+    }
+    
+    setTargetSlots(newSlots);
+    setSelectedLetter(null);
+    setSelectedSource(null);
+  };
+
+  const handleStorageClick = () => {
+    if (!selectedLetter || !selectedSource) return;
+    
+    if (selectedSource.type === 'slot') {
+      const newSlots = [...targetSlots];
+      newSlots[selectedSource.index] = '';
+      setTargetSlots(newSlots);
+      setAvailableLetters([...availableLetters, selectedLetter]);
+    }
+    
+    setSelectedLetter(null);
+    setSelectedSource(null);
+  };
+
+  // מערכת Drag & Drop לדסקטופ
   const handleDragStart = (letter, source) => {
     setDraggedLetter(letter);
     setDragSource(source);
@@ -352,16 +420,6 @@ const SortLettersGame = ({ setScreen }) => {
     setDragSource(null);
   };
 
-  const handleRemoveLetter = (slotIndex) => {
-    const letter = targetSlots[slotIndex];
-    if (!letter) return;
-
-    const newSlots = [...targetSlots];
-    newSlots[slotIndex] = '';
-    setTargetSlots(newSlots);
-    setAvailableLetters([...availableLetters, letter]);
-  };
-
   const checkOrder = () => {
     if (targetSlots.some(slot => slot === '')) {
       setMessage('עוד לא סיימתם! צריך למלא את כל המשבצות');
@@ -407,6 +465,10 @@ const SortLettersGame = ({ setScreen }) => {
     resetToInitial();
   };
 
+  const isLetterSelected = (letter, source) => {
+    return selectedLetter === letter && JSON.stringify(selectedSource) === JSON.stringify(source);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-200 to-green-300 flex flex-col items-center justify-between p-4 overflow-hidden relative" dir="rtl">
       <HomeButton setScreen={setScreen} />
@@ -417,15 +479,14 @@ const SortLettersGame = ({ setScreen }) => {
       </div>
 
       <div className="w-full max-w-2xl z-10">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl md:text-4xl font-bold text-amber-800">סדר את האותיות</h1>
-          <div className="flex gap-1">
-            {[...Array(5)].map((_, i) => (
-              <span key={i} className="text-2xl md:text-3xl">
-                {i < stars ? '⭐' : '☆'}
-              </span>
-            ))}
-          </div>
+        <h1 className="text-2xl md:text-4xl font-bold text-amber-800 mb-3 text-center">סדר את האותיות</h1>
+        
+        <div className="flex justify-center gap-1 mb-4">
+          {[...Array(5)].map((_, i) => (
+            <span key={i} className="text-2xl md:text-3xl">
+              {i < stars ? '⭐' : '☆'}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -433,25 +494,32 @@ const SortLettersGame = ({ setScreen }) => {
         {!gameComplete ? (
           <div className="w-full space-y-8">
             <div className="bg-white bg-opacity-80 rounded-2xl p-4 shadow-lg">
-              <p className="text-lg font-bold text-amber-800 mb-3 text-center">גררו את האותיות:</p>
+              <p className="text-lg font-bold text-amber-800 mb-3 text-center">גררו או לחצו על האותיות:</p>
               <div 
                 className="flex justify-center gap-3 flex-wrap min-h-20 p-2 border-4 border-dashed border-green-500 rounded-xl bg-green-50"
                 onDragOver={handleDragOver}
                 onDrop={handleDropToStorage}
+                onClick={handleStorageClick}
               >
                 {availableLetters.map((letter, index) => (
                   <div
                     key={`${letter}-${index}`}
                     draggable
                     onDragStart={() => handleDragStart(letter, { type: 'storage' })}
-                    className="w-16 h-16 md:w-20 md:h-20 bg-orange-400 hover:bg-orange-500 rounded-xl shadow-lg cursor-move flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 active:scale-95 transition-transform"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLetterClick(letter, { type: 'storage' });
+                    }}
+                    className={`w-16 h-16 md:w-20 md:h-20 bg-orange-400 hover:bg-orange-500 rounded-xl shadow-lg cursor-pointer flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 active:scale-95 transition-transform
+                      ${isLetterSelected(letter, { type: 'storage' }) ? 'ring-4 ring-blue-500 scale-105' : ''}
+                    `}
                   >
                     {letter}
                   </div>
                 ))}
                 {availableLetters.length === 0 && (
                   <div className="text-gray-400 text-center py-4 w-full">
-                    גררו אותיות לכאן כדי להחזיר
+                    לחצו כאן עם אות נבחרת להחזיר
                   </div>
                 )}
               </div>
@@ -467,10 +535,11 @@ const SortLettersGame = ({ setScreen }) => {
                     onDragStart={() => letter && handleDragStart(letter, { type: 'slot', index })}
                     onDragOver={handleDragOver}
                     onDrop={() => handleDrop(index)}
-                    onClick={() => handleRemoveLetter(index)}
+                    onClick={() => letter ? handleLetterClick(letter, { type: 'slot', index }) : handleSlotClick(index)}
                     className={`w-16 h-16 md:w-20 md:h-20 border-4 border-dashed border-amber-600 rounded-xl flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 transition-all
-                      ${letter ? 'bg-orange-300 cursor-move hover:bg-orange-200' : 'bg-white bg-opacity-50'}
+                      ${letter ? 'bg-orange-300 cursor-pointer hover:bg-orange-200' : 'bg-white bg-opacity-50 cursor-pointer'}
                       ${shakeSlots.includes(index) ? 'animate-shake bg-red-300' : ''}
+                      ${letter && isLetterSelected(letter, { type: 'slot', index }) ? 'ring-4 ring-blue-500 scale-105' : ''}
                     `}
                   >
                     {letter}
@@ -499,7 +568,7 @@ const SortLettersGame = ({ setScreen }) => {
             <div className="text-3xl font-bold text-amber-800">
               קיבלתם {stars} כוכבים!
             </div>
-            <div className="flex gap-4 justify-center">
+            <div className="flex gap-4 justify-center flex-wrap">
               <button
                 onClick={resetGame}
                 className="bg-orange-400 hover:bg-orange-500 px-8 py-4 rounded-full text-xl font-bold text-amber-900 shadow-lg hover:shadow-xl transition-all"
@@ -535,7 +604,7 @@ const SortLettersGame = ({ setScreen }) => {
           </div>
           
           <div className="flex justify-between items-center text-sm md:text-base text-gray-600">
-            <div className="text-amber-700">💡 טיפ: גררו בין משבצות להחלפה, או חזרה למחסן</div>
+            <div className="text-amber-700">💡 לחצו/גררו אותיות להחלפה</div>
             <div>טעויות: {mistakes}</div>
           </div>
         </div>
@@ -659,15 +728,14 @@ const MemoryLettersGame = ({ setScreen }) => {
       </div>
 
       <div className="w-full max-w-2xl z-10">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl md:text-4xl font-bold text-amber-800">זיכרון האותיות</h1>
-          <div className="flex gap-1">
-            {[...Array(5)].map((_, i) => (
-              <span key={i} className="text-2xl md:text-3xl">
-                {i < stars ? '⭐' : '☆'}
-              </span>
-            ))}
-          </div>
+        <h1 className="text-2xl md:text-4xl font-bold text-amber-800 mb-3 text-center">זיכרון האותיות</h1>
+        
+        <div className="flex justify-center gap-1 mb-4">
+          {[...Array(5)].map((_, i) => (
+            <span key={i} className="text-2xl md:text-3xl">
+              {i < stars ? '⭐' : '☆'}
+            </span>
+          ))}
         </div>
         
         <div className="bg-white bg-opacity-80 rounded-lg p-3 text-center shadow-lg">
@@ -710,7 +778,7 @@ const MemoryLettersGame = ({ setScreen }) => {
             <div className="text-xl text-gray-700">
               סיימתם ב-{mistakes + letters.length} מהלכים
             </div>
-            <div className="flex gap-4 justify-center">
+            <div className="flex gap-4 justify-center flex-wrap">
               <button
                 onClick={resetGame}
                 className="bg-orange-400 hover:bg-orange-500 px-8 py-4 rounded-full text-xl font-bold text-amber-900 shadow-lg hover:shadow-xl transition-all"

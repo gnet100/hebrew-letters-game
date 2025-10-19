@@ -172,7 +172,7 @@ const FindLetterGame = ({ setScreen }) => {
         <div className="absolute top-20 left-10 w-40 h-40 bg-green-500 rounded-full blur-3xl animate-pulse"></div>
       </div>
 
-      <div className="w-full max-w-2xl z-10">
+      <div className="w-full max-w-2xl z-10 pt-16">
         <h1 className="text-2xl md:text-4xl font-bold text-amber-800 mb-3 text-center">מצא את האות</h1>
         
         <div className="flex justify-center gap-1 mb-4">
@@ -288,11 +288,21 @@ const SortLettersGame = ({ setScreen }) => {
   const [speaker, setSpeaker] = useState('dog');
   const [gameComplete, setGameComplete] = useState(false);
   const [shakeSlots, setShakeSlots] = useState([]);
+  const [isMobile, setIsMobile] = useState(false);
   
   const correctOrder = ['א', 'ב', 'ג', 'ד', 'ה'];
 
   useEffect(() => {
+    // זיהוי אם זה מובייל
+    const checkMobile = () => {
+      setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
     resetToInitial();
+    
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const resetToInitial = () => {
@@ -305,18 +315,16 @@ const SortLettersGame = ({ setScreen }) => {
     setMistakes(0);
     setStars(5);
     setGameComplete(false);
-    setMessage('סדרו את האותיות לפי הא"ב!');
+    setMessage(isMobile ? 'לחצו על אות ואז על משבצת!' : 'סדרו את האותיות לפי הא"ב!');
     setSpeaker('dog');
   };
 
-  // מערכת לחיצות למובייל
+  // מערכת לחיצות (למובייל ודסקטופ)
   const handleLetterClick = (letter, source) => {
     if (selectedLetter === letter && JSON.stringify(selectedSource) === JSON.stringify(source)) {
-      // ביטול בחירה
       setSelectedLetter(null);
       setSelectedSource(null);
     } else {
-      // בחירת אות
       setSelectedLetter(letter);
       setSelectedSource(source);
     }
@@ -366,18 +374,23 @@ const SortLettersGame = ({ setScreen }) => {
     setSelectedSource(null);
   };
 
-  // מערכת Drag & Drop לדסקטופ
-  const handleDragStart = (letter, source) => {
+  // מערכת Drag & Drop (רק לדסקטופ)
+  const handleDragStart = (e, letter, source) => {
+    if (isMobile) {
+      e.preventDefault();
+      return;
+    }
     setDraggedLetter(letter);
     setDragSource(source);
   };
 
   const handleDragOver = (e) => {
+    if (isMobile) return;
     e.preventDefault();
   };
 
   const handleDrop = (slotIndex) => {
-    if (!draggedLetter) return;
+    if (isMobile || !draggedLetter) return;
 
     const newSlots = [...targetSlots];
     
@@ -407,7 +420,7 @@ const SortLettersGame = ({ setScreen }) => {
   };
 
   const handleDropToStorage = () => {
-    if (!draggedLetter || !dragSource) return;
+    if (isMobile || !draggedLetter || !dragSource) return;
     
     if (dragSource.type === 'slot') {
       const newSlots = [...targetSlots];
@@ -470,7 +483,7 @@ const SortLettersGame = ({ setScreen }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-200 to-green-300 flex flex-col items-center justify-between p-4 overflow-hidden relative" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-b from-green-200 to-green-300 flex flex-col items-center justify-between p-4 overflow-hidden relative touch-none" dir="rtl">
       <HomeButton setScreen={setScreen} />
       
       <div className="absolute inset-0 opacity-20">
@@ -478,7 +491,7 @@ const SortLettersGame = ({ setScreen }) => {
         <div className="absolute top-20 left-10 w-40 h-40 bg-green-500 rounded-full blur-3xl animate-pulse"></div>
       </div>
 
-      <div className="w-full max-w-2xl z-10">
+      <div className="w-full max-w-2xl z-10 pt-16">
         <h1 className="text-2xl md:text-4xl font-bold text-amber-800 mb-3 text-center">סדר את האותיות</h1>
         
         <div className="flex justify-center gap-1 mb-4">
@@ -494,7 +507,9 @@ const SortLettersGame = ({ setScreen }) => {
         {!gameComplete ? (
           <div className="w-full space-y-8">
             <div className="bg-white bg-opacity-80 rounded-2xl p-4 shadow-lg">
-              <p className="text-lg font-bold text-amber-800 mb-3 text-center">גררו או לחצו על האותיות:</p>
+              <p className="text-lg font-bold text-amber-800 mb-3 text-center">
+                {isMobile ? 'לחצו על האותיות:' : 'גררו או לחצו על האותיות:'}
+              </p>
               <div 
                 className="flex justify-center gap-3 flex-wrap min-h-20 p-2 border-4 border-dashed border-green-500 rounded-xl bg-green-50"
                 onDragOver={handleDragOver}
@@ -504,13 +519,13 @@ const SortLettersGame = ({ setScreen }) => {
                 {availableLetters.map((letter, index) => (
                   <div
                     key={`${letter}-${index}`}
-                    draggable
-                    onDragStart={() => handleDragStart(letter, { type: 'storage' })}
+                    draggable={!isMobile}
+                    onDragStart={(e) => handleDragStart(e, letter, { type: 'storage' })}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleLetterClick(letter, { type: 'storage' });
                     }}
-                    className={`w-16 h-16 md:w-20 md:h-20 bg-orange-400 hover:bg-orange-500 rounded-xl shadow-lg cursor-pointer flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 active:scale-95 transition-transform
+                    className={`w-16 h-16 md:w-20 md:h-20 bg-orange-400 hover:bg-orange-500 rounded-xl shadow-lg cursor-pointer flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 active:scale-95 transition-transform select-none
                       ${isLetterSelected(letter, { type: 'storage' }) ? 'ring-4 ring-blue-500 scale-105' : ''}
                     `}
                   >
@@ -519,7 +534,7 @@ const SortLettersGame = ({ setScreen }) => {
                 ))}
                 {availableLetters.length === 0 && (
                   <div className="text-gray-400 text-center py-4 w-full">
-                    לחצו כאן עם אות נבחרת להחזיר
+                    {isMobile ? 'לחצו כאן עם אות נבחרת' : 'גררו/לחצו כאן להחזיר אות'}
                   </div>
                 )}
               </div>
@@ -531,12 +546,12 @@ const SortLettersGame = ({ setScreen }) => {
                 {targetSlots.map((letter, index) => (
                   <div
                     key={index}
-                    draggable={!!letter}
-                    onDragStart={() => letter && handleDragStart(letter, { type: 'slot', index })}
+                    draggable={!isMobile && !!letter}
+                    onDragStart={(e) => letter && handleDragStart(e, letter, { type: 'slot', index })}
                     onDragOver={handleDragOver}
                     onDrop={() => handleDrop(index)}
                     onClick={() => letter ? handleLetterClick(letter, { type: 'slot', index }) : handleSlotClick(index)}
-                    className={`w-16 h-16 md:w-20 md:h-20 border-4 border-dashed border-amber-600 rounded-xl flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 transition-all
+                    className={`w-16 h-16 md:w-20 md:h-20 border-4 border-dashed border-amber-600 rounded-xl flex items-center justify-center text-4xl md:text-5xl font-bold text-amber-900 transition-all select-none
                       ${letter ? 'bg-orange-300 cursor-pointer hover:bg-orange-200' : 'bg-white bg-opacity-50 cursor-pointer'}
                       ${shakeSlots.includes(index) ? 'animate-shake bg-red-300' : ''}
                       ${letter && isLetterSelected(letter, { type: 'slot', index }) ? 'ring-4 ring-blue-500 scale-105' : ''}
@@ -604,7 +619,9 @@ const SortLettersGame = ({ setScreen }) => {
           </div>
           
           <div className="flex justify-between items-center text-sm md:text-base text-gray-600">
-            <div className="text-amber-700">💡 לחצו/גררו אותיות להחלפה</div>
+            <div className="text-amber-700">
+              {isMobile ? '💡 לחצו על אות ואז על משבצת' : '💡 לחצו/גררו אותיות להחלפה'}
+            </div>
             <div>טעויות: {mistakes}</div>
           </div>
         </div>
@@ -618,6 +635,17 @@ const SortLettersGame = ({ setScreen }) => {
         }
         .animate-shake {
           animation: shake 0.5s;
+        }
+        .touch-none {
+          touch-action: none;
+          -webkit-user-drag: none;
+          -webkit-touch-callout: none;
+        }
+        .select-none {
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
         }
       `}</style>
     </div>
@@ -727,7 +755,7 @@ const MemoryLettersGame = ({ setScreen }) => {
         <div className="absolute top-20 left-10 w-40 h-40 bg-green-500 rounded-full blur-3xl animate-pulse"></div>
       </div>
 
-      <div className="w-full max-w-2xl z-10">
+      <div className="w-full max-w-2xl z-10 pt-16">
         <h1 className="text-2xl md:text-4xl font-bold text-amber-800 mb-3 text-center">זיכרון האותיות</h1>
         
         <div className="flex justify-center gap-1 mb-4">
